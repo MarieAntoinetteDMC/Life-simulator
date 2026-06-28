@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人生シミュレーター</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c9a84c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="人生設計">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1520;
+    --surface: #1a2236;
+    --surface2: #232f45;
+    --border: #2e3d5a;
+    --accent: #c9a84c;
+    --accent2: #e8c97a;
+    --text: #e8eaf0;
+    --text-muted: #8a9bbf;
+    --green: #4caf82;
+    --red: #e05a5a;
+    --blue: #4a90d9;
+    --radius: 10px;
+    --font: 'Segoe UI', 'Hiragino Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+  header {
+    background: linear-gradient(135deg, #1a2236 0%, #0f1c33 100%);
+    border-bottom: 2px solid var(--accent);
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  header h1 { font-size: 20px; font-weight: 700; color: var(--accent2); letter-spacing: 0.05em; }
+  header .subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .crown { font-size: 26px; }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    height: calc(100vh - 58px);
+  }
+
+  .left-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 14px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .left-panel::-webkit-scrollbar { width: 6px; }
+  .left-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 13px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    letter-spacing: 0.1em; margin-bottom: 11px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .field-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; gap: 8px;
+  }
+  .field-row:last-child { margin-bottom: 0; }
+
+  label { font-size: 12px; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+
+  input[type="number"], input[type="month"] {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text);
+    padding: 5px 8px; font-size: 13px; font-family: var(--font);
+    width: 100px; text-align: right; outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+  .unit { font-size: 11px; color: var(--text-muted); white-space: nowrap; width: 46px; }
+
+  /* 第2収入カード */
+  .income2-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .income2-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+  }
+  .income2-item label {
+    display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 4px;
+  }
+  .income2-item input { width: 100%; font-size: 13px; }
+
+  /* 年金スライダー */
+  .pension-adj {
+    margin-top: 10px; padding: 10px;
+    background: var(--bg); border-radius: 8px; border: 1px solid var(--border);
+  }
+  .pension-adj label { color: var(--text); font-size: 12px; }
+  .slider-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); height: 4px; }
+  .pension-effect { font-size: 11px; color: var(--text-muted); margin-top: 5px; text-align: right; }
+
+  /* 生活費 */
+  .expense-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .expense-item { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px; }
+  .expense-item label { display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+  .expense-item input { width: 100%; text-align: right; font-size: 13px; }
+
+  .calc-btn {
+    width: 100%; padding: 11px;
+    background: linear-gradient(135deg, var(--accent) 0%, #b8902e 100%);
+    border: none; border-radius: var(--radius);
+    color: #1a1208; font-weight: 800; font-size: 15px; font-family: var(--font);
+    cursor: pointer; letter-spacing: 0.05em;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .calc-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* 右パネル */
+  .right-panel { display: flex; flex-direction: column; overflow: hidden; }
+
+  .stats-bar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 10px 20px; display: flex; gap: 24px; flex-shrink: 0; flex-wrap: wrap;
+  }
+  .stat-label { font-size: 10px; color: var(--text-muted); letter-spacing: 0.08em; }
+  .stat-value { font-size: 18px; font-weight: 700; margin-top: 1px; }
+  .stat-value.positive { color: var(--green); }
+  .stat-value.negative { color: var(--red); }
+  .stat-value.gold { color: var(--accent2); }
+
+  /* タブ */
+  .tab-bar {
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+    display: flex; flex-shrink: 0;
+  }
+  .tab-btn {
+    padding: 8px 20px; font-size: 12px; font-family: var(--font);
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+  }
+  .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent); }
+  .tab-btn:hover { color: var(--text); }
+
+  .chart-area { flex: 1; padding: 16px 20px; position: relative; min-height: 0; }
+  .chart-wrap { position: relative; height: 100%; }
+  .legend-note { font-size: 11px; color: var(--text-muted); margin-top: 6px; text-align: center; }
+
+  /* ===== スマホ対応 ===== */
+  /* モバイル用パネル切替タブ */
+  .mobile-panel-tabs {
+    display: none;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    flex-shrink: 0;
+  }
+  .mobile-panel-btn {
+    flex: 1; padding: 11px 8px;
+    font-size: 13px; font-weight: 700; font-family: var(--font);
+    background: none; border: none; border-bottom: 3px solid transparent;
+    color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+  }
+  .mobile-panel-btn.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+  @media (max-width: 700px) {
+    header { padding: 10px 14px; }
+    header h1 { font-size: 16px; }
+    header .subtitle { display: none; }
+    .crown { font-size: 20px; }
+
+    .main-layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+      height: calc(100vh - 48px);
+    }
+
+    /* モバイルタブ表示 */
+    .mobile-panel-tabs { display: flex; }
+
+    /* パネル切替 */
+    .left-panel {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      height: calc(100vh - 48px - 44px);
+      overflow-y: auto;
+    }
+    .right-panel {
+      height: calc(100vh - 48px - 44px);
+    }
+    .left-panel.sp-hidden,
+    .right-panel.sp-hidden { display: none; }
+
+    /* 入力欄を広く */
+    input[type="number"], input[type="month"] {
+      width: 110px;
+      font-size: 15px;
+      padding: 7px 8px;
+    }
+    label { font-size: 13px; }
+    .unit { font-size: 12px; width: 50px; }
+    .card { padding: 12px; }
+    .card-title { font-size: 12px; margin-bottom: 10px; }
+
+    /* 生活費グリッド：2列維持 */
+    .expense-item input { font-size: 15px; }
+    .expense-item label { font-size: 11px; }
+
+    /* 第2収入：縦積みに */
+    .income2-grid { grid-template-columns: 1fr 1fr 1fr; }
+    .income2-item input { font-size: 14px; }
+
+    /* stats-bar：横スクロール */
+    .stats-bar {
+      padding: 8px 12px;
+      gap: 16px;
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      -webkit-overflow-scrolling: touch;
+    }
+    .stat-item { flex-shrink: 0; }
+    .stat-value { font-size: 15px; }
+    .stat-label { font-size: 9px; }
+
+    /* グラフタブ */
+    .tab-btn { padding: 7px 10px; font-size: 11px; }
+
+    /* チャートエリア */
+    .chart-area { padding: 10px 12px; }
+
+    /* ボタン */
+    .calc-btn { font-size: 16px; padding: 14px; }
+
+    /* スライダー */
+    .pension-effect { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="crown">♟</span>
+  <div>
+    <h1>人生シミュレーター</h1>
+    <div class="subtitle">収入・年金・生活費・資産の総合ライフプランツール</div>
+  </div>
+</header>
+
+<div class="mobile-panel-tabs">
+  <button class="mobile-panel-btn active" id="sp-tab-input" onclick="switchSpPanel('input')">⚙️ 入力設定</button>
+  <button class="mobile-panel-btn" id="sp-tab-chart" onclick="switchSpPanel('chart')">📊 グラフ</button>
+</div>
+
+<div class="main-layout">
+
+  <div class="left-panel">
+
+    <!-- 基本設定 -->
+    <div class="card">
+      <div class="card-title">📅 基本設定</div>
+      <div class="field-row">
+        <label>誕生年月</label>
+        <input type="month" id="birthMonth" value="1963-03">
+        <span class="unit"></span>
+      </div>
+      <div class="field-row">
+        <label>現在の収入</label>
+        <input type="number" id="currentIncome" value="45" step="1" min="0">
+        <span class="unit">万円/月</span>
+      </div>
+      <div class="field-row">
+        <label>収入終了年齢</label>
+        <input type="number" id="retireAge" value="65" min="50" max="85">
+        <span class="unit">歳</span>
+      </div>
+    </div>
+
+    <!-- 第2収入 -->
+    <div class="card">
+      <div class="card-title">💼 第2収入（再雇用・副収入）</div>
+      <div class="income2-grid">
+        <div class="income2-item">
+          <label>開始年齢</label>
+          <input type="number" id="income2_start" value="60" min="50" max="90">
+        </div>
+        <div class="income2-item">
+          <label>終了年齢</label>
+          <input type="number" id="income2_end" value="100" min="50" max="100">
+        </div>
+        <div class="income2-item">
+          <label>月額（万円）</label>
+          <input type="number" id="income2_amount" value="5" step="0.5" min="0">
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">
+        ※ 0万円の場合は収入なしとして計算します
+      </div>
+    </div>
+
+    <!-- 年金設定 -->
+    <div class="card">
+      <div class="card-title">🏛️ 年金設定</div>
+      <div class="field-row">
+        <label>基本受給開始年齢</label>
+        <input type="number" id="pensionBaseAge" value="65" min="60" max="75">
+        <span class="unit">歳</span>
+      </div>
+      <div class="field-row">
+        <label>月額年金額</label>
+        <input type="number" id="pensionAmount" value="19" step="0.5" min="0">
+        <span class="unit">万円/月</span>
+      </div>
+      <div class="pension-adj">
+        <label>繰上げ（−）／繰下げ（＋）設定</label>
+        <div class="slider-row">
+          <span style="font-size:11px;color:var(--text-muted)">−60月</span>
+          <input type="range" id="pensionAdjSlider" min="-60" max="60" value="0" step="1" oninput="updatePensionSlider()">
+          <span style="font-size:11px;color:var(--text-muted)">＋60月</span>
+        </div>
+        <div class="pension-effect" id="pensionSliderLabel">調整なし（65歳）　支給額：変更なし</div>
+      </div>
+    </div>
+
+    <!-- 生活費 -->
+    <div class="card">
+      <div class="card-title">💴 毎月の生活費　<span style="font-weight:400;color:var(--text-muted);font-size:10px">（万円/月）</span></div>
+      <div class="expense-grid">
+        <div class="expense-item"><label>🏠 住居費</label><input type="number" id="exp_housing" value="2" step="0.5" min="0"></div>
+        <div class="expense-item"><label>🍱 食費</label><input type="number" id="exp_food" value="8" step="0.5" min="0"></div>
+        <div class="expense-item"><label>💡 電気・ガス・水道</label><input type="number" id="exp_utility" value="6" step="0.1" min="0"></div>
+        <div class="expense-item"><label>📱 通信費</label><input type="number" id="exp_comm" value="3" step="0.1" min="0"></div>
+        <div class="expense-item"><label>🚗 車関係</label><input type="number" id="exp_car" value="2" step="0.5" min="0"></div>
+        <div class="expense-item"><label>🛒 雑費</label><input type="number" id="exp_misc" value="5" step="0.5" min="0"></div>
+        <div class="expense-item"><label>🏥 医療・保険</label><input type="number" id="exp_medical" value="4" step="0.1" min="0"></div>
+        <div class="expense-item"><label>⚡ 突発費用（月均し）</label><input type="number" id="exp_emergency" value="3" step="0.5" min="0"></div>
+      </div>
+      <div style="margin-top:9px;padding:7px;background:var(--bg);border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:var(--text-muted)">月間合計生活費</span>
+        <span id="totalExpense" style="font-size:15px;font-weight:700;color:var(--accent2)">23.8 万円</span>
+      </div>
+
+      <!-- 高齢期増額 -->
+      <div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--border);">
+        <div style="font-size:11px;font-weight:700;color:#e05a5a;margin-bottom:9px;">🏥 高齢期・医療介護費増額</div>
+        <div class="field-row">
+          <label>増額開始年齢</label>
+          <input type="number" id="elderly_age" value="75" min="60" max="90" style="width:80px;">
+          <span class="unit">歳〜</span>
+        </div>
+        <div class="field-row">
+          <label>生活費増額率</label>
+          <input type="number" id="elderly_rate" value="30" min="0" max="200" step="5" style="width:80px;">
+          <span class="unit">%増し</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">
+          例：30%増し → 23.8万円が <span id="elderlyExpPreview" style="color:#e8c97a;font-weight:700;">30.9万円</span>/月 になります
+        </div>
+      </div>
+    </div>
+
+    <!-- 資産 -->
+    <div class="card">
+      <div class="card-title">💰 現在の資産</div>
+      <div class="field-row">
+        <label>現預金</label>
+        <input type="number" id="asset_cash" value="1500" step="10" min="0">
+        <span class="unit">万円</span>
+      </div>
+      <div class="field-row">
+        <label>投資額（株・投信等）</label>
+        <input type="number" id="asset_invest" value="2500" step="10" min="0">
+        <span class="unit">万円</span>
+      </div>
+      <div class="field-row">
+        <label>投資年利回り想定</label>
+        <input type="number" id="invest_return" value="2.0" step="0.1" min="0" max="15">
+        <span class="unit">%</span>
+      </div>
+      <div class="field-row">
+        <label>インフレ率想定</label>
+        <input type="number" id="inflation_rate" value="3.0" step="0.1" min="0" max="10">
+        <span class="unit">%</span>
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="simulate()">📊 シミュレーション実行</button>
+
+  </div><!-- /left-panel -->
+
+  <!-- 右パネル -->
+  <div class="right-panel">
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-label">現在年齢</div>
+        <div class="stat-value gold" id="statAge">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">現在総資産</div>
+        <div class="stat-value gold" id="statCurrentAsset">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">資産ゼロ到達</div>
+        <div class="stat-value" id="statZeroAge">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">90歳時残資産</div>
+        <div class="stat-value" id="statAt90">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">年金受給開始</div>
+        <div class="stat-value gold" id="statPensionStart">—</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">第2収入期間</div>
+        <div class="stat-value gold" id="statIncome2">—</div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('asset')" id="tab-asset">📈 資産推移</button>
+      <button class="tab-btn" onclick="switchTab('cashflow')" id="tab-cashflow">📊 年間収支</button>
+      <button class="tab-btn" onclick="switchTab('both')" id="tab-both">🔀 重ね合わせ</button>
+    </div>
+
+    <div class="chart-area">
+      <div class="chart-wrap">
+        <canvas id="lifeChart"></canvas>
+      </div>
+      <div class="legend-note" id="chartNote">※ インフレ調整後の実質資産推移。縦軸単位：万円</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let chart = null;
+let currentTab = 'asset';
+let simResult = null;
+
+function switchSpPanel(panel) {
+  const left  = document.querySelector('.left-panel');
+  const right = document.querySelector('.right-panel');
+  document.getElementById('sp-tab-input').classList.toggle('active', panel === 'input');
+  document.getElementById('sp-tab-chart').classList.toggle('active', panel === 'chart');
+  if (panel === 'input') {
+    left.classList.remove('sp-hidden');
+    right.classList.add('sp-hidden');
+  } else {
+    left.classList.add('sp-hidden');
+    right.classList.remove('sp-hidden');
+    // グラフをリサイズ反映
+    if (chart) chart.resize();
+  }
+}
+
+function man(id) {
+  return (parseFloat(document.getElementById(id).value) || 0) * 10000;
+}
+
+function updatePensionSlider() {
+  const v = parseInt(document.getElementById('pensionAdjSlider').value);
+  const baseAge = parseInt(document.getElementById('pensionBaseAge').value) || 65;
+  const adjMonths = v;
+  const startAge = baseAge + adjMonths / 12;
+  let rate = 0, label = '';
+  if (adjMonths < 0) {
+    rate = adjMonths * 0.4;
+    label = `繰上げ ${Math.abs(adjMonths)}ヶ月（${startAge.toFixed(1)}歳から受給）　支給率：${(100+rate).toFixed(1)}%`;
+  } else if (adjMonths > 0) {
+    rate = adjMonths * 0.7;
+    label = `繰下げ ${adjMonths}ヶ月（${startAge.toFixed(1)}歳から受給）　支給率：${(100+rate).toFixed(1)}%`;
+  } else {
+    label = `調整なし（${baseAge}歳から受給）　支給額：変更なし`;
+  }
+  document.getElementById('pensionSliderLabel').textContent = label;
+  updateExpenseTotal();
+}
+
+function updateExpenseTotal() {
+  const ids = ['exp_housing','exp_food','exp_utility','exp_comm','exp_car','exp_misc','exp_medical','exp_emergency'];
+  const total = ids.reduce((s,id) => s + (parseFloat(document.getElementById(id).value)||0), 0);
+  document.getElementById('totalExpense').textContent = total.toFixed(1) + ' 万円';
+  updateElderlyPreview(total);
+}
+function updateElderlyPreview(total) {
+  if (total === undefined) {
+    const ids = ['exp_housing','exp_food','exp_utility','exp_comm','exp_car','exp_misc','exp_medical','exp_emergency'];
+    total = ids.reduce((s,id) => s + (parseFloat(document.getElementById(id).value)||0), 0);
+  }
+  const rate = parseFloat(document.getElementById('elderly_rate').value) || 0;
+  const after = total * (1 + rate / 100);
+  document.getElementById('elderlyExpPreview').textContent = after.toFixed(1) + '万円';
+}
+['exp_housing','exp_food','exp_utility','exp_comm','exp_car','exp_misc','exp_medical','exp_emergency'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateExpenseTotal);
+});
+document.getElementById('elderly_rate').addEventListener('input', () => updateElderlyPreview());
+document.getElementById('elderly_age').addEventListener('input', () => updateElderlyPreview());
+
+function fmtMan(yen) {
+  const m = yen / 10000;
+  if (Math.abs(m) >= 10000) return (m/10000).toFixed(1) + '億円';
+  return m.toFixed(0) + '万円';
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['asset','cashflow','both'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t === tab);
+  });
+  if (simResult) drawChart(simResult);
+}
+
+function simulate() {
+  const birthVal = document.getElementById('birthMonth').value;
+  if (!birthVal) { alert('誕生年月を入力してください'); return; }
+
+  const [birthYear, birthMonthNum] = birthVal.split('-').map(Number);
+  const now = new Date();
+  const ageNow = (now.getFullYear() - birthYear) + (now.getMonth() + 1 - birthMonthNum) / 12;
+  const ageNowInt = Math.floor(ageNow);
+
+  const currentIncome   = man('currentIncome');
+  const retireAge       = parseFloat(document.getElementById('retireAge').value) || 65;
+  const income2Start    = parseFloat(document.getElementById('income2_start').value) || 999;
+  const income2End      = parseFloat(document.getElementById('income2_end').value) || 999;
+  const income2Amount   = man('income2_amount');
+  const pensionBaseAge  = parseFloat(document.getElementById('pensionBaseAge').value) || 65;
+  const pensionAmtBase  = man('pensionAmount');
+  const adjMonths       = parseInt(document.getElementById('pensionAdjSlider').value);
+
+  let pensionRate = 1.0;
+  if (adjMonths < 0) pensionRate = 1 + adjMonths * 0.004;
+  if (adjMonths > 0) pensionRate = 1 + adjMonths * 0.007;
+  const pensionMonthly  = pensionAmtBase * pensionRate;
+  const pensionStartAge = pensionBaseAge + adjMonths / 12;
+
+  const elderlyAge  = parseFloat(document.getElementById('elderly_age').value) || 75;
+  const elderlyRate = parseFloat(document.getElementById('elderly_rate').value) / 100 || 0;
+
+  const expIds = ['exp_housing','exp_food','exp_utility','exp_comm','exp_car','exp_misc','exp_medical','exp_emergency'];
+  const monthlyExpBase = expIds.reduce((s,id) => s + man(id), 0);
+
+  const cashAsset    = man('asset_cash');
+  const investAsset  = man('asset_invest');
+  const investReturn = parseFloat(document.getElementById('invest_return').value) / 100 || 0;
+  const inflation    = parseFloat(document.getElementById('inflation_rate').value) / 100 || 0;
+
+  const ages=[], totalAssets=[], cashAssets=[], investAssets=[], annualCFs=[];
+  const incomeByAge=[], expenseByAge=[], pensionByAge=[], income2ByAge=[];
+  let cash = cashAsset, invest = investAsset, zeroAge = null;
+
+  for (let age = ageNowInt; age <= 100; age++) {
+    const yearsFromNow = age - ageNow;
+    const inflAdj    = Math.pow(1 + inflation, Math.max(0, yearsFromNow));
+    const elderlyMul = (age >= elderlyAge) ? (1 + elderlyRate) : 1;
+    const expYear    = monthlyExpBase * 12 * inflAdj * elderlyMul;
+    const incYear   = (age < retireAge) ? currentIncome * 12 : 0;
+    const inc2Year  = (age >= income2Start && age < income2End) ? income2Amount * 12 : 0;
+    const penYear   = (age >= pensionStartAge) ? pensionMonthly * 12 : 0;
+
+    invest *= (1 + investReturn);
+
+    const totalIncome = incYear + inc2Year + penYear;
+    const cf = totalIncome - expYear;
+
+    if (cf >= 0) {
+      cash += cf;
+    } else {
+      const deficit = -cf;
+      if (cash >= deficit) {
+        cash -= deficit;
+      } else {
+        invest -= (deficit - cash);
+        cash = 0;
+      }
+    }
+    if (invest < 0) { cash += invest; invest = 0; }
+
+    const total = cash + invest;
+    ages.push(age);
+    totalAssets.push(Math.round(total / 10000));
+    cashAssets.push(Math.round(cash / 10000));
+    investAssets.push(Math.round(invest / 10000));
+    annualCFs.push(Math.round(cf / 10000));
+    incomeByAge.push(Math.round(incYear / 10000));
+    income2ByAge.push(Math.round(inc2Year / 10000));
+    pensionByAge.push(Math.round(penYear / 10000));
+    expenseByAge.push(Math.round(-expYear / 10000));
+
+    if (total <= 0 && zeroAge === null) zeroAge = age;
+  }
+
+  simResult = { ages, totalAssets, cashAssets, investAssets, annualCFs,
+    incomeByAge, income2ByAge, pensionByAge, expenseByAge,
+    retireAge, pensionStartAge, income2Start, income2End, income2Amount,
+    elderlyAge, elderlyRate, zeroAge };
+
+  // stats
+  document.getElementById('statAge').textContent = ageNowInt + '歳';
+  document.getElementById('statCurrentAsset').textContent = fmtMan(cashAsset + investAsset);
+  document.getElementById('statZeroAge').textContent = zeroAge ? zeroAge + '歳' : '100歳超 ✓';
+  document.getElementById('statZeroAge').className = 'stat-value ' + (zeroAge ? 'negative' : 'positive');
+
+  const idx90 = ages.indexOf(90);
+  if (idx90 >= 0) {
+    const v90 = totalAssets[idx90] * 10000;
+    document.getElementById('statAt90').textContent = fmtMan(v90);
+    document.getElementById('statAt90').className = 'stat-value ' + (v90 > 0 ? 'positive' : 'negative');
+  }
+  document.getElementById('statPensionStart').textContent = pensionStartAge.toFixed(1) + '歳';
+
+  const i2label = income2Amount > 0
+    ? `${income2Start}〜${income2End}歳`
+    : 'なし';
+  document.getElementById('statIncome2').textContent = i2label;
+
+  drawChart(simResult);
+
+  // スマホは自動でグラフパネルへ切替
+  if (window.innerWidth <= 700) switchSpPanel('chart');
+}
+
+function drawChart(r) {
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('lifeChart').getContext('2d');
+  const { ages, totalAssets, cashAssets, investAssets, annualCFs,
+    incomeByAge, income2ByAge, pensionByAge, expenseByAge,
+    retireAge, pensionStartAge, income2Start, income2End, income2Amount,
+    elderlyAge, elderlyRate, zeroAge } = r;
+
+  let datasets = [];
+  let noteText = '';
+  let chartType = 'line';
+  let yLabel = '万円';
+
+  if (currentTab === 'asset') {
+    datasets = [
+      { label: '総資産', data: totalAssets, type:'line', borderColor:'#c9a84c', backgroundColor:'rgba(201,168,76,0.12)', borderWidth:2.5, pointRadius:0, pointHoverRadius:5, fill:true, tension:0.3, yAxisID:'y' },
+      { label: '現預金', data: cashAssets, type:'line', borderColor:'#4a90d9', backgroundColor:'rgba(74,144,217,0.06)', borderWidth:1.5, pointRadius:0, fill:false, tension:0.3, borderDash:[4,3], yAxisID:'y' },
+      { label: '投資資産', data: investAssets, type:'line', borderColor:'#4caf82', backgroundColor:'rgba(76,175,130,0.06)', borderWidth:1.5, pointRadius:0, fill:false, tension:0.3, borderDash:[2,4], yAxisID:'y' },
+    ];
+    noteText = '※ インフレ調整後の実質資産推移。縦軸単位：万円';
+
+  } else if (currentTab === 'cashflow') {
+    // 収支棒グラフ：収入積み上げ（正）＋生活費（負）
+    datasets = [
+      { label: '給与収入', data: incomeByAge, type:'bar', backgroundColor:'rgba(74,144,217,0.75)', stack:'income', yAxisID:'y' },
+      { label: '第2収入', data: income2ByAge, type:'bar', backgroundColor:'rgba(156,120,220,0.75)', stack:'income', yAxisID:'y' },
+      { label: '年金', data: pensionByAge, type:'bar', backgroundColor:'rgba(76,175,130,0.75)', stack:'income', yAxisID:'y' },
+      { label: '生活費（マイナス）', data: expenseByAge, type:'bar', backgroundColor:'rgba(224,90,90,0.65)', stack:'expense', yAxisID:'y' },
+    ];
+    noteText = '※ 年間収支。収入（上方・積み上げ）と生活費（下方）を表示。単位：万円/年';
+
+  } else {
+    // 重ね合わせ：資産ラインと年間CF棒グラフ
+    const cfColors = annualCFs.map(v => v >= 0 ? 'rgba(76,175,130,0.6)' : 'rgba(224,90,90,0.6)');
+    datasets = [
+      { label: '年間収支', data: annualCFs, type:'bar', backgroundColor: cfColors, yAxisID:'y2', order:2 },
+      { label: '総資産', data: totalAssets, type:'line', borderColor:'#c9a84c', backgroundColor:'rgba(201,168,76,0.08)', borderWidth:2.5, pointRadius:0, pointHoverRadius:5, fill:true, tension:0.3, yAxisID:'y', order:1 },
+    ];
+    noteText = '※ 棒グラフ：年間収支（緑=黒字/赤=赤字）、折れ線：総資産推移。単位：万円';
+  }
+
+  const scales = {
+    x: {
+      title: { display:true, text:'年齢（歳）', color:'#8a9bbf', font:{size:12} },
+      ticks: {
+        color:'#8a9bbf', font:{size:11}, maxRotation:0,
+        callback: (val, i) => (ages[i] % 5 === 0) ? ages[i]+'歳' : '',
+      },
+      grid: { color:'rgba(46,61,90,0.5)' },
+      stacked: currentTab === 'cashflow',
+    },
+    y: {
+      title: { display:true, text:'万円', color:'#8a9bbf', font:{size:12} },
+      ticks: {
+        color:'#8a9bbf', font:{size:11},
+        callback: v => Math.abs(v)>=10000 ? (v/10000).toFixed(1)+'億' : v.toLocaleString()+'万',
+      },
+      grid: { color:'rgba(46,61,90,0.5)' },
+      stacked: currentTab === 'cashflow',
+      position: 'left',
+    },
+  };
+
+  if (currentTab === 'both') {
+    scales.y2 = {
+      title: { display:true, text:'年間収支（万円）', color:'#8a9bbf', font:{size:11} },
+      ticks: {
+        color:'#8a9bbf', font:{size:10},
+        callback: v => v.toLocaleString()+'万',
+      },
+      grid: { drawOnChartArea: false },
+      position: 'right',
+    };
+  }
+
+  document.getElementById('chartNote').textContent = noteText;
+
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: ages, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: {
+          labels: { color:'#8a9bbf', font:{size:12}, usePointStyle:true, pointStyleWidth:14 }
+        },
+        tooltip: {
+          backgroundColor:'#1a2236', borderColor:'#2e3d5a', borderWidth:1,
+          titleColor:'#c9a84c', bodyColor:'#e8eaf0',
+          callbacks: {
+            title: items => items[0].label + '歳',
+            label: item => {
+              const v = item.raw;
+              let s = '  ' + item.dataset.label + ': ';
+              if (Math.abs(v) >= 10000) s += (v/10000).toFixed(2)+'億円';
+              else s += v.toLocaleString()+'万円';
+              return s;
+            }
+          }
+        }
+      },
+      scales,
+    },
+    plugins: [{
+      id: 'vlines',
+      afterDraw(chart) {
+        const ctx = chart.ctx;
+        const xAxis = chart.scales.x;
+        const yAxis = chart.scales.y;
+
+        const lines = [
+          { age: retireAge, color:'#e8c97a', label:`定年${retireAge}歳` },
+          { age: Math.round(pensionStartAge), color:'#4caf82', label:`年金${pensionStartAge.toFixed(1)}歳〜` },
+          { age: elderlyAge, color:'#e05a5a', label:`医療費増(+${Math.round(elderlyRate*100)}%)` },
+        ];
+        if (income2Amount > 0) {
+          lines.push({ age: income2Start, color:'#9c78dc', label:`第2収入開始` });
+          lines.push({ age: income2End,   color:'#9c78dc', label:`第2収入終了` });
+        }
+        if (zeroAge) lines.push({ age: zeroAge, color:'#e05a5a', label:`資産0 ${zeroAge}歳` });
+
+        lines.forEach(({ age, color, label }) => {
+          const x = xAxis.getPixelForValue(age);
+          if (x < xAxis.left || x > xAxis.right) return;
+          ctx.save();
+          ctx.setLineDash([5,4]);
+          ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.7;
+          ctx.beginPath(); ctx.moveTo(x, yAxis.top); ctx.lineTo(x, yAxis.bottom); ctx.stroke();
+          ctx.setLineDash([]); ctx.globalAlpha = 1;
+          ctx.fillStyle = color; ctx.font = '10px Segoe UI, sans-serif';
+          ctx.fillText(label, x + 3, yAxis.top + 14);
+          ctx.restore();
+        });
+
+        // ゼロライン
+        const y0 = yAxis.getPixelForValue(0);
+        if (y0 >= yAxis.top && y0 <= yAxis.bottom) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(224,90,90,0.35)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(xAxis.left, y0); ctx.lineTo(xAxis.right, y0); ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }]
+  });
+}
+
+updatePensionSlider();
+simulate();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .then(reg => console.log("SW registered:", reg.scope))
+      .catch(err => console.warn("SW failed:", err));
+  });
+}
+</script>
+</body>
+</html>
